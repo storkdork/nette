@@ -414,6 +414,17 @@ final class Debug
 	 */
 	public static function _errorHandler($severity, $message, $file, $line, $context)
 	{
+		if ($severity === E_WARNING || $severity === E_RECOVERABLE_ERROR) { // convert to exception?
+			$trace = debug_backtrace(FALSE);
+			if (isset($trace[2]['function'])) {
+				$func = $trace[2]['function'];
+				$func = isset($trace[2]['class']) ? new \ReflectionMethod($trace[2]['class'], $func) : new \ReflectionFunction($func);
+				if (strpos($func->getDocComment(), '@warnings')) {
+					throw new \ErrorException($message, 0, $severity, $file, $line);
+				}
+			}
+		}
+
 		if (self::$lastError !== FALSE) { // tryError mode
 			self::$lastError = new \ErrorException($message, 0, $severity, $file, $line);
 			return NULL;
