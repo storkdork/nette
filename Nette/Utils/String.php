@@ -326,13 +326,20 @@ final class String
 	 * @param  string
 	 * @param  int
 	 * @return array
+	 * @warnings
 	 */
 	public static function split($subject, $pattern, $flags = 0)
 	{
-		Debug::tryError();
-		$res = preg_split($pattern, $subject, -1, $flags | PREG_SPLIT_DELIM_CAPTURE);
-		self::catchPregError($pattern);
-		return $res;
+		try {
+			$res = preg_split($pattern, $subject, -1, $flags | PREG_SPLIT_DELIM_CAPTURE);
+			if ($code = preg_last_error()) {
+				throw new RegexpException(RegexpException::$messages[$code] . " (pattern: $pattern)", $code); // run-time error
+			}
+			return $res;
+
+		} catch (\ErrorException $e) {
+			throw new RegexpException($e->getMessage() . " in pattern: $pattern"); // compile-time error
+		}
 	}
 
 
@@ -344,14 +351,19 @@ final class String
 	 * @param  int
 	 * @param  int
 	 * @return mixed
+	 * @warnings
 	 */
 	public static function match($subject, $pattern, $flags = 0, $offset = 0)
 	{
-		Debug::tryError();
-		$res = preg_match($pattern, $subject, $m, $flags, $offset);
-		self::catchPregError($pattern);
-		if ($res) {
-			return $m;
+		try {
+			$res = preg_match($pattern, $subject, $m, $flags, $offset);
+			if ($code = preg_last_error()) {
+				throw new RegexpException(RegexpException::$messages[$code] . " (pattern: $pattern)", $code); // run-time error
+			} elseif ($res) {
+				return $m;
+			}
+		} catch (\ErrorException $e) {
+			throw new RegexpException($e->getMessage() . " in pattern: $pattern"); // compile-time error
 		}
 	}
 
@@ -364,13 +376,20 @@ final class String
 	 * @param  int  (PREG_SET_ORDER is default)
 	 * @param  int
 	 * @return array
+	 * @warnings
 	 */
 	public static function matchAll($subject, $pattern, $flags = 0, $offset = 0)
 	{
-		Debug::tryError();
-		$res = preg_match_all($pattern, $subject, $m, ($flags & PREG_PATTERN_ORDER) ? $flags : ($flags | PREG_SET_ORDER), $offset);
-		self::catchPregError($pattern);
-		return $m;
+		try {
+			preg_match_all($pattern, $subject, $m, ($flags & PREG_PATTERN_ORDER) ? $flags : ($flags | PREG_SET_ORDER), $offset);
+			if ($code = preg_last_error()) {
+				throw new RegexpException(RegexpException::$messages[$code] . " (pattern: $pattern)", $code); // run-time error
+			}
+			return $m;
+
+		} catch (\ErrorException $e) {
+			throw new RegexpException($e->getMessage() . " in pattern: $pattern"); // compile-time error
+		}
 	}
 
 
@@ -382,55 +401,33 @@ final class String
 	 * @param  string|callback
 	 * @param  int
 	 * @return string
+	 * @warnings
 	 */
 	public static function replace($subject, $pattern, $replacement = NULL, $limit = -1)
 	{
-		Debug::tryError();
-		if (is_object($replacement) || is_array($replacement)) {
-			if ($replacement instanceof Callback) {
-				$replacement = $replacement->getNative();
-			}
-			if (!is_callable($replacement, FALSE, $textual)) {
-				Debug::catchError($foo);
-				throw new \InvalidStateException("Callback '$textual' is not callable.");
-			}
-			$res = preg_replace_callback($pattern, $replacement, $subject, $limit);
-
-			if (Debug::catchError($e)) { // compile error
-				$trace = $e->getTrace();
-				if (isset($trace[2]['class']) && $trace[2]['class'] === __CLASS__) {
-					throw new RegexpException($e->getMessage() . " in pattern: $pattern");
+		try {
+			if (is_object($replacement) || is_array($replacement)) {
+				if ($replacement instanceof Callback) {
+					$replacement = $replacement->getNative();
 				}
+				if (!is_callable($replacement, FALSE, $textual)) {
+					throw new \InvalidStateException("Callback '$textual' is not callable.");
+				}
+				$res = preg_replace_callback($pattern, $replacement, $subject, $limit);
+
+			} elseif (is_array($pattern)) {
+				$res = preg_replace(array_keys($pattern), array_values($pattern), $subject, $limit);
+
+			} else {
+				$res = preg_replace($pattern, $replacement, $subject, $limit);
 			}
+			if ($code = preg_last_error()) {
+				throw new RegexpException(RegexpException::$messages[$code] . " (pattern: $pattern)", $code); // run-time error
+			}
+			return $res;
 
-		} elseif (is_array($pattern)) {
-			$res = preg_replace(array_keys($pattern), array_values($pattern), $subject, $limit);
-
-		} else {
-			$res = preg_replace($pattern, $replacement, $subject, $limit);
-		}
-		self::catchPregError($pattern);
-		return $res;
-	}
-
-
-
-	/** @internal */
-	public static function catchPregError($pattern)
-	{
-		if (Debug::catchError($e)) { // compile error
-			throw new RegexpException($e->getMessage() . " in pattern: $pattern");
-
-		} elseif (preg_last_error()) { // run-time error
-			static $messages = array(
-				PREG_INTERNAL_ERROR => 'Internal error',
-				PREG_BACKTRACK_LIMIT_ERROR => 'Backtrack limit was exhausted',
-				PREG_RECURSION_LIMIT_ERROR => 'Recursion limit was exhausted',
-				PREG_BAD_UTF8_ERROR => 'Malformed UTF-8 data',
-				5 => 'Offset didn\'t correspond to the begin of a valid UTF-8 code point', // PREG_BAD_UTF8_OFFSET_ERROR
-			);
-			$code = preg_last_error();
-			throw new RegexpException((isset($messages[$code]) ? $messages[$code] : 'Unknown error') . " (pattern: $pattern)", $code);
+		} catch (\ErrorException $e) {
+			throw new RegexpException($e->getMessage() . " in pattern: $pattern"); // compile-time error
 		}
 	}
 
@@ -443,4 +440,13 @@ final class String
  */
 class RegexpException extends \Exception
 {
+	/** @internal */
+	public static $messages = array(
+		PREG_INTERNAL_ERROR => 'Internal error',
+		PREG_BACKTRACK_LIMIT_ERROR => 'Backtrack limit was exhausted',
+		PREG_RECURSION_LIMIT_ERROR => 'Recursion limit was exhausted',
+		PREG_BAD_UTF8_ERROR => 'Malformed UTF-8 data',
+		5 => 'Offset didn\'t correspond to the begin of a valid UTF-8 code point', // PREG_BAD_UTF8_OFFSET_ERROR
+	);
+
 }

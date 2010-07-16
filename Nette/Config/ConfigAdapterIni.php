@@ -50,6 +50,7 @@ final class ConfigAdapterIni implements IConfigAdapter
 	 * @param  string  section to load
 	 * @return array
 	 * @throws \InvalidStateException
+	 * @warnings
 	 */
 	public static function load($file, $section = NULL)
 	{
@@ -57,11 +58,7 @@ final class ConfigAdapterIni implements IConfigAdapter
 			throw new \FileNotFoundException("File '$file' is missing or is not readable.");
 		}
 
-		Nette\Debug::tryError();
 		$ini = parse_ini_file($file, TRUE);
-		if (Nette\Debug::catchError($e)) {
-			throw $e;
-		}
 
 		$separator = trim(self::$sectionSeparator);
 		$data = array();

@@ -50,6 +50,7 @@ class MemcachedStorage extends Nette\Object implements ICacheStorage
 
 
 
+	/** @warnings */
 	public function __construct($host = 'localhost', $port = 11211, $prefix = '', Nette\Context $context = NULL)
 	{
 		if (!self::isAvailable()) {
@@ -59,9 +60,9 @@ class MemcachedStorage extends Nette\Object implements ICacheStorage
 		$this->prefix = $prefix;
 		$this->context = $context;
 		$this->memcache = new \Memcache;
-		Nette\Debug::tryError();
-		$this->memcache->connect($host, $port);
-		if (Nette\Debug::catchError($e)) {
+		try {
+			$this->memcache->connect($host, $port);
+		} catch (\ErrorException $e) {
 			throw new \InvalidStateException($e->getMessage());
 		}
 	}

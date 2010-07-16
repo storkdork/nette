@@ -91,9 +91,6 @@ final class Debug
 	/** @var bool {@link Debug::enable()} */
 	private static $enabled = FALSE;
 
-	/** @var mixed {@link Debug::tryError()} FALSE means catching is disabled */
-	private static $lastError = FALSE;
-
 	/********************* debug bar ****************d*g**/
 
 	/** @var bool determines whether show Debug Bar */
@@ -425,11 +422,6 @@ final class Debug
 			}
 		}
 
-		if (self::$lastError !== FALSE) { // tryError mode
-			self::$lastError = new \ErrorException($message, 0, $severity, $file, $line);
-			return NULL;
-		}
-
 		if (self::$scream) {
 			error_reporting(E_ALL | E_STRICT);
 		}
@@ -498,37 +490,6 @@ final class Debug
 			trigger_error($exception->getMessage(), E_USER_ERROR);
 		}
 		exit;
-	}
-
-
-
-	/**
-	 * Starts catching potential errors/warnings.
-	 * @return void
-	 */
-	public static function tryError()
-	{
-		if (!self::$enabled && self::$lastError === FALSE) {
-			set_error_handler(array(__CLASS__, '_errorHandler'));
-		}
-		self::$lastError = NULL;
-	}
-
-
-
-	/**
-	 * Returns catched error/warning message.
-	 * @param  \ErrorException  catched error
-	 * @return bool
-	 */
-	public static function catchError(& $error)
-	{
-		if (!self::$enabled && self::$lastError !== FALSE) {
-			restore_error_handler();
-		}
-		$error = self::$lastError;
-		self::$lastError = FALSE;
-		return (bool) $error;
 	}
 
 
