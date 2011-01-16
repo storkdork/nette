@@ -115,7 +115,12 @@ class TestCase
 				throw new Exception("Unable to execute '$binary -v'.");
 			}
 
-			if (!preg_match('#^PHP (\S+).*cgi#i', $output[0], $matches)) {
+			$pattern = '/^PHP (\S+).*?cgi/i';
+			if (preg_match('/ubuntu/', $output[0]))
+				// PHP 5.3.2-1ubuntu4.5 with Suhosin-Patch (cli) (built: Sep 17 2010 13:41:55)
+				$pattern = '/^PHP ([0-9.]+)/i';
+
+			if (!preg_match($pattern, $output[0], $matches)) {
 				throw new Exception("Unable to detect PHP version (output: $output[0]).");
 			}
 
@@ -154,12 +159,17 @@ class TestCase
 
 		$this->output = file_get_contents($tempFile);
 		unlink($tempFile);
+		if ($this->output == "") return; // command does not product any output
 
-		list($headers, $this->output) = explode("\r\n\r\n", $this->output, 2); // CGI
+		$splitted = preg_split("/\r?\n\r?\n/", $this->output, 2); // CGI
+		if (count($splitted) != 2)
+			throw new TestCaseException($this->output);
+
+		list($headers, $this->output) = $splitted;
 		$line = @end(explode("\n", $this->output));
 
 		$this->headers = array();
-		foreach (explode("\r\n", $headers) as $header) {
+		foreach (preg_split("/\r?\n/", $headers) as $header) {
 			$a = strpos($header, ':');
 			if ($a !== FALSE) {
 				$this->headers[trim(substr($header, 0, $a))] = (string) trim(substr($header, $a + 1));
