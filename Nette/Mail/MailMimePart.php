@@ -139,24 +139,15 @@ class MailMimePart extends Nette\Object
 			return NULL;
 
 		} elseif (is_array($this->headers[$name])) {
-			$s = '';
+			$recipients = array();
 			foreach ($this->headers[$name] as $email => $name) {
-				if ($name != NULL) { // intentionally ==
-					$s .= self::encodeHeader(
-						strpbrk($name, '.,;<@>()[]"=?') ? '"' . addcslashes($name, '"\\') . '"' : $name,
-						$offset
-					);
-					$email = " <$email>";
+				if ($name === NULL) {
+					$recipients[] = $email;
+				} else {
+					$recipients[] = self::mimeEncode($name)." <$email>";
 				}
-				$email .= ',';
-				if ($s !== '' && $offset + strlen($email) > self::LINE_LENGTH) {
-					$s .= self::EOL . "\t";
-					$offset = 1;
-				}
-				$s .= $email;
-				$offset += strlen($email);
 			}
-			return substr($s, 0, -1); // last comma
+			return implode(",\n\t", $recipients);
 
 		} else {
 			return self::encodeHeader($this->headers[$name], $offset);
@@ -314,6 +305,20 @@ class MailMimePart extends Nette\Object
 	/********************* QuotedPrintable helpers ****************d*g**/
 
 
+	static public function mimeEncode($text) {
+		// if text include non ascii characters encode this with base64
+		if (preg_match('/[^A-Za-z0-9 ]/', $text))
+			// remove string ": " from the beginning of the text ": =?UTF-8?B?VEVTVCDEjS4gMQ==?="
+			$text = substr(iconv_mime_encode("", $text, array(
+						'scheme' => 'B',
+						'input-charset' => 'UTF-8',
+						'output-charset' => 'UTF-8',
+						'line-break-chars' => "\n"
+					)), 2);
+			//possible alternative - encode with quoted-printable
+			//$text = '=?UTF-8?Q?'.quoted_printable_encode($text).'?=';
+		return $text;
+	}
 
 	/**
 	 * Converts a 8 bit header to a quoted-printable string.
